@@ -1,4 +1,6 @@
 import uuid
+from datetime import date
+from typing import Any
 
 from pydantic import BaseModel, EmailStr
 
@@ -26,5 +28,22 @@ class UserResponse(BaseModel):
     email: str
     full_name: str
     timezone: str
+    mascot_name: str
+    weekly_intentions: Any | None = None
+    weekly_intentions_week: date | None = None
+    language: str = "es"
 
     model_config = {"from_attributes": True}
+
+
+class PatchMeRequest(BaseModel):
+    full_name: str | None = None
+    timezone: str | None = None
+    mascot_name: str | None = None
+    weekly_intentions: Any | None = None
+    weekly_intentions_week: date | None = None
+    language: str | None = None
+
+
+class GoogleAuthRequest(BaseModel):
+    access_token: str

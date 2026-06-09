@@ -6,6 +6,10 @@ from alembic import context
 
 from app.config import settings
 from app.database import Base
+import app.modules.auth.models  # noqa: F401
+import app.modules.calendar.models  # noqa: F401
+import app.modules.events.models  # noqa: F401
+import app.modules.context.models  # noqa: F401
 
 config = context.config
 

@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     google_client_id: str = ""
     google_client_secret: str = ""
     google_redirect_uri: str = ""
+    deep_link_scheme: str = "calendario"
 
     # Fernet
     fernet_key: str = ""

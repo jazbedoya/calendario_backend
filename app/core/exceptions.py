@@ -15,6 +15,9 @@ async def app_exception_handler(request: Request, exc: AppException) -> JSONResp
 async def unhandled_exception_handler(
     request: Request, exc: Exception
 ) -> JSONResponse:
+    import traceback
+    import structlog
+    structlog.get_logger().error("unhandled_exception", error=str(exc), traceback=traceback.format_exc())
     return JSONResponse(
         status_code=500,
         content={"detail": "Internal server error"},

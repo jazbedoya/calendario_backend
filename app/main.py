@@ -1,5 +1,11 @@
+import asyncio
+import sys
 from contextlib import asynccontextmanager
 from collections.abc import AsyncGenerator
+
+# asyncpg requires SelectorEventLoop on Windows (ProactorEventLoop causes hangs)
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 import structlog
 from fastapi import FastAPI
@@ -7,6 +13,13 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.core.exceptions import AppException, app_exception_handler, unhandled_exception_handler
+from app.modules.auth.router import router as auth_router
+from app.modules.calendar.router import router as calendar_router
+from app.modules.events.router import router as events_router
+from app.modules.context.router import router as context_router
+from app.modules.stats.router import router as stats_router
+from app.modules.tasks.router import router as tasks_router
+from app.modules.home.router import router as home_router
 
 structlog.configure(
     processors=[
@@ -37,7 +50,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"] if settings.debug else [],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -45,10 +58,13 @@ app.add_middleware(
 app.add_exception_handler(AppException, app_exception_handler)  # type: ignore[arg-type]
 app.add_exception_handler(Exception, unhandled_exception_handler)
 
-# TODO: incluir routers de módulos aquí a partir del Sprint 1
-# app.include_router(auth_router)
-# app.include_router(events_router)
-# ...
+app.include_router(auth_router)
+app.include_router(calendar_router)
+app.include_router(events_router)
+app.include_router(context_router)
+app.include_router(stats_router)
+app.include_router(tasks_router)
+app.include_router(home_router)
 
 
 @app.get("/health", tags=["ops"])
