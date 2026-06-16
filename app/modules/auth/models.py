@@ -21,6 +21,9 @@ class User(Base):
     weekly_intentions: Mapped[Any | None] = mapped_column(JSON, nullable=True, default=None)
     weekly_intentions_week: Mapped[date | None] = mapped_column(Date, nullable=True, default=None)
     language: Mapped[str] = mapped_column(String(5), nullable=False, default="es")
+    email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    email_verification_token: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    email_verification_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

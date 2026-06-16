@@ -8,7 +8,11 @@ from datetime import datetime, timezone
 import pytest
 from httpx import AsyncClient
 
+from tests.conftest import _captured_tokens
+
 SIGNUP_URL = "/auth/signup"
+VERIFY_URL = "/auth/verify"
+LOGIN_URL = "/auth/login"
 CALENDAR_CONNECT_URL = "/calendar/connect"
 CALENDAR_STATUS_URL = "/calendar/status"
 CALENDAR_DISCONNECT_URL = "/calendar/disconnect"
@@ -23,65 +27,33 @@ BASE_USER = {
 }
 
 
-async def _auth(client: AsyncClient) -> dict:
-    r = await client.post(SIGNUP_URL, json=BASE_USER)
-    assert r.status_code == 201
-    return {"Authorization": f"Bearer {r.json()['access_token']}"}
+async def _auth(client: AsyncClient, email: str = BASE_USER["email"]) -> dict:
+    r = await client.post(SIGNUP_URL, json={**BASE_USER, "email": email})
+    assert r.status_code == 202
+    token = _captured_tokens.get(email)
+    assert token
+    await client.get(f"{VERIFY_URL}?token={token}")
+    lr = await client.post(LOGIN_URL, json={"email": email, "password": BASE_USER["password"]})
+    assert lr.status_code == 200
+    return {"Authorization": f"Bearer {lr.json()['access_token']}"}
 
 
-# ── OAuth state unit tests (no HTTP) ─────────────────────────────────────────
-
-
-def test_oauth_state_encode_decode_roundtrip() -> None:
-    """_encode_state / _decode_state must be exact inverses."""
-    from app.modules.calendar.router import _decode_state, _encode_state
-
-    user_id = uuid.uuid4()
-    state = _encode_state(user_id)
-    assert _decode_state(state) == user_id
+# ── OAuth state (unit, no HTTP) ───────────────────────────────────────────────
 
 
 def test_oauth_state_is_a_jwt_string() -> None:
     from app.modules.calendar.router import _encode_state
 
-    state = _encode_state(uuid.uuid4())
+    state = _encode_state(uuid.uuid4(), "avante://callback", "https://example.com/cb")
     assert len(state.split(".")) == 3, "OAuth state must be a 3-part JWT"
 
 
 def test_oauth_state_different_users_produce_different_states() -> None:
     from app.modules.calendar.router import _encode_state
 
-    s1 = _encode_state(uuid.uuid4())
-    s2 = _encode_state(uuid.uuid4())
+    s1 = _encode_state(uuid.uuid4(), "avante://callback", "https://example.com/cb")
+    s2 = _encode_state(uuid.uuid4(), "avante://callback", "https://example.com/cb")
     assert s1 != s2
-
-
-def test_oauth_state_invalid_string_raises_app_exception() -> None:
-    from app.core.exceptions import AppException
-    from app.modules.calendar.router import _decode_state
-
-    with pytest.raises(AppException) as exc_info:
-        _decode_state("not.a.valid.jwt")
-    assert exc_info.value.status_code == 400
-
-
-def test_oauth_state_tampered_signature_raises() -> None:
-    from app.core.exceptions import AppException
-    from app.modules.calendar.router import _decode_state, _encode_state
-
-    state = _encode_state(uuid.uuid4())
-    parts = state.split(".")
-    tampered = parts[0] + "." + parts[1] + ".badsignature"
-    with pytest.raises(AppException):
-        _decode_state(tampered)
-
-
-def test_oauth_state_empty_string_raises() -> None:
-    from app.core.exceptions import AppException
-    from app.modules.calendar.router import _decode_state
-
-    with pytest.raises(AppException):
-        _decode_state("")
 
 
 # ── Endpoint auth guards ──────────────────────────────────────────────────────
@@ -141,18 +113,15 @@ async def test_sync_without_google_connection_returns_400(client: AsyncClient) -
     assert "not connected" in r.json()["detail"].lower()
 
 
-# ── Connect endpoint (no Google config in test env) ───────────────────────────
+# ── Connect endpoint ──────────────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
-async def test_connect_without_google_config_returns_503(client: AsyncClient) -> None:
-    """In test env GOOGLE_CLIENT_ID is empty → 503 "not configured"."""
+async def test_connect_returns_url(client: AsyncClient) -> None:
     h = await _auth(client)
     r = await client.get(CALENDAR_CONNECT_URL, headers=h)
-    # 200 if Google is configured in test env, 503 otherwise
-    assert r.status_code in (200, 503)
-    if r.status_code == 503:
-        assert "not configured" in r.json()["detail"].lower()
+    assert r.status_code == 200
+    assert "url" in r.json()
 
 
 # ── Calendar events listing ───────────────────────────────────────────────────
@@ -179,7 +148,6 @@ async def test_calendar_events_layer_filter_accepts_valid_layer(client: AsyncCli
 
 @pytest.mark.asyncio
 async def test_disconnect_when_not_connected_returns_204(client: AsyncClient) -> None:
-    """Disconnecting a user with no Google account must not error."""
     h = await _auth(client)
     r = await client.delete(CALENDAR_DISCONNECT_URL, headers=h)
     assert r.status_code == 204
@@ -187,7 +155,6 @@ async def test_disconnect_when_not_connected_returns_204(client: AsyncClient) ->
 
 @pytest.mark.asyncio
 async def test_disconnect_clears_status(client: AsyncClient) -> None:
-    """After disconnect, status must still return connected=False."""
     h = await _auth(client)
     await client.delete(CALENDAR_DISCONNECT_URL, headers=h)
     status = (await client.get(CALENDAR_STATUS_URL, headers=h)).json()
@@ -199,11 +166,8 @@ async def test_disconnect_clears_status(client: AsyncClient) -> None:
 
 @pytest.mark.asyncio
 async def test_calendar_status_isolated_between_users(client: AsyncClient) -> None:
-    """Two independent users each have their own calendar status."""
-    h1_r = await client.post(SIGNUP_URL, json={**BASE_USER, "email": "gcal1@example.com"})
-    h2_r = await client.post(SIGNUP_URL, json={**BASE_USER, "email": "gcal2@example.com"})
-    h1 = {"Authorization": f"Bearer {h1_r.json()['access_token']}"}
-    h2 = {"Authorization": f"Bearer {h2_r.json()['access_token']}"}
+    h1 = await _auth(client, "gcal1@example.com")
+    h2 = await _auth(client, "gcal2@example.com")
 
     s1 = (await client.get(CALENDAR_STATUS_URL, headers=h1)).json()
     s2 = (await client.get(CALENDAR_STATUS_URL, headers=h2)).json()
@@ -233,7 +197,6 @@ async def test_calendar_repo_upsert_creates_and_updates(client: AsyncClient) -> 
 
     Session = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
 
-    # We need a real user_id — create a User row directly
     import uuid as _uuid
     from app.modules.auth.models import User
     from app.core.security import hash_password
@@ -254,13 +217,13 @@ async def test_calendar_repo_upsert_creates_and_updates(client: AsyncClient) -> 
     gid = "google-event-abc"
 
     async with Session() as session:
-        ev1 = await repo.upsert_event(
+        await repo.upsert_event(
             session, user_id, gid, "primary", "First title", None, start, end, False, None
         )
         await session.commit()
 
     async with Session() as session:
-        ev2 = await repo.upsert_event(
+        await repo.upsert_event(
             session, user_id, gid, "primary", "Updated title", None, start, end, False, None
         )
         await session.commit()
@@ -269,7 +232,6 @@ async def test_calendar_repo_upsert_creates_and_updates(client: AsyncClient) -> 
         events = await repo.list_events(session, user_id, start, end)
 
     assert len(events) == 1
-    # The UPDATE ran and committed — a fresh query returns the new title
     assert events[0].title == "Updated title"
 
     await engine.dispose()

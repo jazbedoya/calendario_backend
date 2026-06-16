@@ -10,6 +10,7 @@ class SignupRequest(BaseModel):
     password: str
     full_name: str
     timezone: str = "UTC"
+    redirect_to: str | None = None  # Deep link para abrir la app tras verificar
 
 
 class LoginRequest(BaseModel):
@@ -47,3 +48,21 @@ class PatchMeRequest(BaseModel):
 
 class GoogleAuthRequest(BaseModel):
     access_token: str
+
+
+class VerificationPendingResponse(BaseModel):
+    detail: str = "verification_email_sent"
+    email: str
+
+
+class ResendVerificationRequest(BaseModel):
+    email: EmailStr
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str

@@ -5,7 +5,11 @@ layer/date filters, overlapping events.
 import pytest
 from httpx import AsyncClient
 
+from tests.conftest import _captured_tokens
+
 SIGNUP_URL = "/auth/signup"
+VERIFY_URL = "/auth/verify"
+LOGIN_URL = "/auth/login"
 EVENTS_URL = "/events"
 
 
@@ -15,8 +19,13 @@ def _user(email: str) -> dict:
 
 async def _auth(client: AsyncClient, email: str = "events@example.com") -> dict:
     r = await client.post(SIGNUP_URL, json=_user(email))
-    assert r.status_code == 201
-    return {"Authorization": f"Bearer {r.json()['access_token']}"}
+    assert r.status_code == 202
+    token = _captured_tokens.get(email)
+    assert token
+    await client.get(f"{VERIFY_URL}?token={token}")
+    lr = await client.post(LOGIN_URL, json={"email": email, "password": "EPass123!"})
+    assert lr.status_code == 200
+    return {"Authorization": f"Bearer {lr.json()['access_token']}"}
 
 
 def _ev(

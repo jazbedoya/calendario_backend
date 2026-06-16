@@ -77,11 +77,29 @@ async def create_google_user(
 ) -> User:
     import secrets
     unusable_hash = f"!google!{secrets.token_hex(32)}"
-    user = User(email=email, hashed_password=unusable_hash, full_name=full_name, google_id=google_id)
+    user = User(email=email, hashed_password=unusable_hash, full_name=full_name, google_id=google_id, email_verified=True)
     db.add(user)
     await db.flush()
     await db.refresh(user)
     return user
+
+
+async def get_user_by_verification_token(db: AsyncSession, token: str) -> User | None:
+    result = await db.execute(select(User).where(User.email_verification_token == token))
+    return result.scalar_one_or_none()
+
+
+async def set_verification_token(db: AsyncSession, user: User, token: str, expires_at: datetime) -> None:
+    user.email_verification_token = token
+    user.email_verification_expires_at = expires_at
+    await db.flush()
+
+
+async def mark_email_verified(db: AsyncSession, user: User) -> None:
+    user.email_verified = True
+    user.email_verification_token = None
+    user.email_verification_expires_at = None
+    await db.flush()
 
 
 async def update_user(db: AsyncSession, user: User, **fields: object) -> User:

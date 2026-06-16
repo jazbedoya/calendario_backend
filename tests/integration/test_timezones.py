@@ -11,7 +11,11 @@ explicit UTC offsets land in the correct month bucket.
 import pytest
 from httpx import AsyncClient
 
+from tests.conftest import _captured_tokens
+
 SIGNUP_URL = "/auth/signup"
+VERIFY_URL = "/auth/verify"
+LOGIN_URL = "/auth/login"
 EVENTS_URL = "/events"
 STATS_URL = "/stats/monthly"
 
@@ -22,8 +26,13 @@ def _user(email: str, tz: str = "UTC") -> dict:
 
 async def _auth(client: AsyncClient, email: str = "tz@example.com", tz: str = "UTC") -> dict:
     r = await client.post(SIGNUP_URL, json=_user(email, tz))
-    assert r.status_code == 201
-    return {"Authorization": f"Bearer {r.json()['access_token']}"}
+    assert r.status_code == 202
+    token = _captured_tokens.get(email)
+    assert token
+    await client.get(f"{VERIFY_URL}?token={token}")
+    lr = await client.post(LOGIN_URL, json={"email": email, "password": "Tz123456!"})
+    assert lr.status_code == 200
+    return {"Authorization": f"Bearer {lr.json()['access_token']}"}
 
 
 def _ev(start: str, end: str, title: str = "E", layer: str = "work") -> dict:

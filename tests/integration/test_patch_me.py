@@ -4,7 +4,11 @@ Integration tests: PATCH /auth/me — update full_name, timezone, mascot_name.
 import pytest
 from httpx import AsyncClient
 
+from tests.conftest import _captured_tokens
+
 SIGNUP_URL = "/auth/signup"
+VERIFY_URL = "/auth/verify"
+LOGIN_URL = "/auth/login"
 ME_URL = "/auth/me"
 PATCH_ME_URL = "/auth/me"
 
@@ -18,8 +22,13 @@ BASE_USER = {
 
 async def _signup_and_auth(client: AsyncClient) -> dict:
     r = await client.post(SIGNUP_URL, json=BASE_USER)
-    assert r.status_code == 201
-    return r.json()
+    assert r.status_code == 202
+    token = _captured_tokens.get(BASE_USER["email"])
+    assert token
+    await client.get(f"{VERIFY_URL}?token={token}")
+    lr = await client.post(LOGIN_URL, json={"email": BASE_USER["email"], "password": BASE_USER["password"]})
+    assert lr.status_code == 200
+    return lr.json()
 
 
 def _auth_headers(tokens: dict) -> dict:

@@ -6,9 +6,13 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from httpx import AsyncClient
 
+from tests.conftest import _captured_tokens
+
 SIGNUP_URL = "/auth/signup"
+VERIFY_URL = "/auth/verify"
+LOGIN_URL = "/auth/login"
 CONNECT_URL = "/calendar/connect"
-CALLBACK_URL = "/calendar/callback"
+CALLBACK_URL = "/auth/google/callback"
 STATUS_URL = "/calendar/status"
 DISCONNECT_URL = "/calendar/disconnect"
 SYNC_URL = "/calendar/sync"
@@ -24,8 +28,13 @@ VALID_USER = {
 
 async def _signup_and_token(client: AsyncClient, email: str = "calendar@test.com") -> str:
     resp = await client.post(SIGNUP_URL, json={**VALID_USER, "email": email})
-    assert resp.status_code == 201
-    return resp.json()["access_token"]
+    assert resp.status_code == 202
+    token = _captured_tokens.get(email)
+    assert token
+    await client.get(f"{VERIFY_URL}?token={token}")
+    lr = await client.post(LOGIN_URL, json={"email": email, "password": VALID_USER["password"]})
+    assert lr.status_code == 200
+    return lr.json()["access_token"]
 
 
 # ── Status ─────────────────────────────────────────────────────────────────────
@@ -53,11 +62,11 @@ async def test_connect_requires_auth(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_connect_returns_503_without_google_config(client: AsyncClient) -> None:
+async def test_connect_returns_url(client: AsyncClient) -> None:
     token = await _signup_and_token(client, "connect_test@test.com")
     resp = await client.get(CONNECT_URL, headers={"Authorization": f"Bearer {token}"})
-    # Google credentials are empty in test environment
-    assert resp.status_code == 503
+    assert resp.status_code == 200
+    assert "url" in resp.json()
 
 
 # ── Callback ───────────────────────────────────────────────────────────────────
@@ -65,7 +74,8 @@ async def test_connect_returns_503_without_google_config(client: AsyncClient) ->
 @pytest.mark.asyncio
 async def test_callback_invalid_state(client: AsyncClient) -> None:
     resp = await client.get(CALLBACK_URL, params={"code": "abc", "state": "invalid"})
-    assert resp.status_code == 400
+    # Invalid state falls back to safe defaults; endpoint always redirects (3xx)
+    assert resp.status_code in (302, 307)
 
 
 # ── Disconnect ─────────────────────────────────────────────────────────────────

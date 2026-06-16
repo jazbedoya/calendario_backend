@@ -17,18 +17,23 @@ class Settings(BaseSettings):
     # Database
     database_url: PostgresDsn
 
-    # Redis
-    redis_url: RedisDsn
+    # Redis (optional — ARQ worker not active yet)
+    redis_url: RedisDsn | None = None
 
     # Auth
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 30
 
-    # Google OAuth (Sprint 2)
+    # Google OAuth
     google_client_id: str = ""
     google_client_secret: str = ""
-    google_redirect_uri: str = ""
+    # Base URL of this backend as seen by the OAuth browser (emulator uses 10.0.2.2, prod uses https domain)
+    google_callback_base_url: str = "http://localhost:9001"
     deep_link_scheme: str = "calendario"
+
+    @property
+    def google_callback_url(self) -> str:
+        return f"{self.google_callback_base_url}/auth/google/callback"
 
     # Fernet
     fernet_key: str = ""
@@ -39,6 +44,7 @@ class Settings(BaseSettings):
     # Email (Sprint 5)
     resend_api_key: str = ""
     email_from: str = "noreply@example.com"
+    app_base_url: str = ""  # Si está vacío, usa request.base_url
 
     @field_validator("secret_key")
     @classmethod

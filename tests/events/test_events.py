@@ -1,7 +1,10 @@
 import pytest
 from httpx import AsyncClient
 
+from tests.conftest import _captured_tokens
+
 SIGNUP_URL = "/auth/signup"
+VERIFY_URL = "/auth/verify"
 LOGIN_URL = "/auth/login"
 EVENTS_URL = "/events"
 
@@ -24,8 +27,13 @@ EVENT_PAYLOAD = {
 
 
 async def _get_token(client: AsyncClient) -> str:
-    await client.post(SIGNUP_URL, json=USER)
+    r = await client.post(SIGNUP_URL, json=USER)
+    assert r.status_code == 202
+    token = _captured_tokens.get(USER["email"])
+    assert token
+    await client.get(f"{VERIFY_URL}?token={token}")
     resp = await client.post(LOGIN_URL, json={"email": USER["email"], "password": USER["password"]})
+    assert resp.status_code == 200
     return resp.json()["access_token"]
 
 
@@ -152,14 +160,15 @@ async def test_delete_event_not_found(client: AsyncClient) -> None:
 @pytest.mark.asyncio
 async def test_events_isolated_between_users(client: AsyncClient) -> None:
     # User A
-    await client.post(SIGNUP_URL, json=USER)
-    token_a = (
-        await client.post(LOGIN_URL, json={"email": USER["email"], "password": USER["password"]})
-    ).json()["access_token"]
+    token_a = await _get_token(client)
 
     # User B
     user_b = {**USER, "email": "b@example.com"}
-    await client.post(SIGNUP_URL, json=user_b)
+    r = await client.post(SIGNUP_URL, json=user_b)
+    assert r.status_code == 202
+    tok_b = _captured_tokens.get(user_b["email"])
+    assert tok_b
+    await client.get(f"{VERIFY_URL}?token={tok_b}")
     token_b = (
         await client.post(LOGIN_URL, json={"email": user_b["email"], "password": USER["password"]})
     ).json()["access_token"]

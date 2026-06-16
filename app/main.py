@@ -49,7 +49,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"] if settings.debug else [],
+    allow_origins=["*"],  # Mobile app (Expo) sends requests from variable origins
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],

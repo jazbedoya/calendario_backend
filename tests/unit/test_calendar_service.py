@@ -59,24 +59,22 @@ def test_build_oauth_url_raises_503_when_not_configured():
     with patch.object(service.settings, "google_client_id", ""), \
          patch.object(service.settings, "google_client_secret", ""):
         with pytest.raises(AppException) as exc:
-            service.build_oauth_url("state123")
+            service.build_oauth_url("state123", "http://localhost/cb")
     assert exc.value.status_code == 503
 
 
 def test_build_oauth_url_contains_state():
     with patch.object(service.settings, "google_client_id", "test-id"), \
-         patch.object(service.settings, "google_client_secret", "test-secret"), \
-         patch.object(service.settings, "google_redirect_uri", "http://localhost/cb"):
-        url = service.build_oauth_url("my_state")
+         patch.object(service.settings, "google_client_secret", "test-secret"):
+        url = service.build_oauth_url("my_state", "http://localhost/cb")
     assert "state=my_state" in url
     assert "accounts.google.com" in url
 
 
 def test_build_oauth_url_contains_required_scopes():
     with patch.object(service.settings, "google_client_id", "test-id"), \
-         patch.object(service.settings, "google_client_secret", "test-secret"), \
-         patch.object(service.settings, "google_redirect_uri", "http://localhost/cb"):
-        url = service.build_oauth_url("s")
+         patch.object(service.settings, "google_client_secret", "test-secret"):
+        url = service.build_oauth_url("s", "http://localhost/cb")
     assert "calendar.readonly" in url
 
 
@@ -323,7 +321,6 @@ def test_sync_triggers_token_refresh_when_expired():
         with patch.object(service.settings, "fernet_key", _FERNET_KEY), \
              patch.object(service.settings, "google_client_id", "id"), \
              patch.object(service.settings, "google_client_secret", "secret"), \
-             patch.object(service.settings, "google_redirect_uri", "http://cb"), \
              patch("app.modules.calendar.service.httpx.AsyncClient", return_value=mock_client):
             async with f() as db:
                 count = await service.sync_user_calendar(db, uid)
@@ -351,10 +348,9 @@ def test_exchange_code_raises_400_on_google_error():
 
         with patch.object(service.settings, "google_client_id", "id"), \
              patch.object(service.settings, "google_client_secret", "secret"), \
-             patch.object(service.settings, "google_redirect_uri", "http://cb"), \
              patch("app.modules.calendar.service.httpx.AsyncClient", return_value=mock_client), \
              pytest.raises(AppException) as exc:
-            await service.exchange_code("bad_code")
+            await service.exchange_code("bad_code", "http://cb")
         return exc.value
 
     exc = _run(_go())

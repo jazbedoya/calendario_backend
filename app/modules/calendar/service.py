@@ -44,13 +44,13 @@ def _decrypt(fernet: Fernet, value: str) -> str:
     return fernet.decrypt(value.encode()).decode()
 
 
-def build_oauth_url(state: str) -> str:
+def build_oauth_url(state: str, redirect_uri: str) -> str:
     _require_google_config()
     import urllib.parse
 
     params = {
         "client_id": settings.google_client_id,
-        "redirect_uri": settings.google_redirect_uri,
+        "redirect_uri": redirect_uri,
         "response_type": "code",
         "scope": " ".join(_SCOPES),
         "access_type": "offline",
@@ -60,7 +60,7 @@ def build_oauth_url(state: str) -> str:
     return f"{_GOOGLE_AUTH_URL}?{urllib.parse.urlencode(params)}"
 
 
-async def exchange_code(code: str) -> dict[str, str]:
+async def exchange_code(code: str, redirect_uri: str) -> dict[str, str]:
     _require_google_config()
     async with httpx.AsyncClient() as client:
         resp = await client.post(
@@ -69,7 +69,7 @@ async def exchange_code(code: str) -> dict[str, str]:
                 "code": code,
                 "client_id": settings.google_client_id,
                 "client_secret": settings.google_client_secret,
-                "redirect_uri": settings.google_redirect_uri,
+                "redirect_uri": redirect_uri,
                 "grant_type": "authorization_code",
             },
         )
@@ -96,12 +96,13 @@ async def connect_calendar(
     db: object,
     user_id: uuid.UUID,
     code: str,
+    redirect_uri: str,
 ) -> GoogleCalendarAccount:
     from sqlalchemy.ext.asyncio import AsyncSession
 
     assert isinstance(db, AsyncSession)
     fernet = _get_fernet()
-    token_data = await exchange_code(code)
+    token_data = await exchange_code(code, redirect_uri)
 
     access_token = token_data["access_token"]
     refresh_token = token_data.get("refresh_token", "")
