@@ -23,3 +23,8 @@ class TaskResponse(BaseModel):
     done: bool
     order: int
     created_at: datetime
+
+
+class StreakResponse(BaseModel):
+    current_streak: int
+    longest_streak: int

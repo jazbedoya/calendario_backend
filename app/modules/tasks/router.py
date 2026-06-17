@@ -8,7 +8,7 @@ from app.database import get_db
 from app.dependencies import get_current_user
 from app.modules.auth.models import User
 from app.modules.tasks import service
-from app.modules.tasks.schemas import CreateTaskRequest, PatchTaskRequest, TaskResponse
+from app.modules.tasks.schemas import CreateTaskRequest, PatchTaskRequest, StreakResponse, TaskResponse
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -42,6 +42,14 @@ async def patch_task(
 ) -> TaskResponse:
     task = await service.patch(db, current_user.id, task_id, data)
     return TaskResponse.model_validate(task)
+
+
+@router.get("/streak", response_model=StreakResponse)
+async def get_streak(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> StreakResponse:
+    return await service.get_streak(db, current_user.id, current_user.timezone)
 
 
 @router.delete("/daily/{task_id}", status_code=204)

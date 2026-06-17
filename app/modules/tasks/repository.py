@@ -7,6 +7,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.tasks.models import DailyTask
 
 
+async def get_done_dates(db: AsyncSession, user_id: uuid.UUID) -> list[date]:
+    """Returns distinct dates (ascending) where the user completed at least one task."""
+    result = await db.execute(
+        select(DailyTask.date)
+        .where(DailyTask.user_id == user_id, DailyTask.done.is_(True))
+        .distinct()
+        .order_by(DailyTask.date.asc())
+    )
+    return list(result.scalars().all())
+
+
 async def list_by_date(db: AsyncSession, user_id: uuid.UUID, task_date: date) -> list[DailyTask]:
     result = await db.execute(
         select(DailyTask)
