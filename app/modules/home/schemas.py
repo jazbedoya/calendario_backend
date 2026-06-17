@@ -10,13 +10,13 @@ class UpcomingEvent(BaseModel):
     is_all_day: bool
 
 
-class WeekHours(BaseModel):
-    family: float
-    work: float
-    personal: float
+class WeekEventCount(BaseModel):
+    family: int
+    work: int
+    personal: int
 
 
 class HomeSummary(BaseModel):
     upcoming_events: list[UpcomingEvent]
-    week_hours_by_layer: WeekHours
+    week_events_by_layer: WeekEventCount
     today_tasks_pending: int

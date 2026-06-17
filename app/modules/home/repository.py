@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.events.models import Event
 from app.modules.tasks.models import DailyTask
-from app.modules.home.schemas import HomeSummary, UpcomingEvent, WeekHours
+from app.modules.home.schemas import HomeSummary, UpcomingEvent, WeekEventCount
 
 
 def _week_bounds() -> tuple[datetime, datetime]:
@@ -47,10 +47,10 @@ async def get_home_summary(db: AsyncSession, user_id: uuid.UUID) -> HomeSummary:
         for e in upcoming_rows
     ]
 
-    # ── 2. Horas por área esta semana ─────────────────────────────────────────
+    # ── 2. Conteo de eventos por área esta semana ─────────────────────────────
     week_start, week_end = _week_bounds()
     result2 = await db.execute(
-        select(Event.layer, Event.start_at, Event.end_at)
+        select(Event.layer, func.count(Event.id))
         .where(
             Event.user_id == user_id,
             Event.deleted_at.is_(None),
@@ -58,19 +58,17 @@ async def get_home_summary(db: AsyncSession, user_id: uuid.UUID) -> HomeSummary:
             Event.start_at <= week_end,
             Event.layer.in_(["family", "work", "personal"]),
         )
+        .group_by(Event.layer)
     )
-    rows = result2.all()
+    counts: dict[str, int] = {"family": 0, "work": 0, "personal": 0}
+    for layer, count in result2.all():
+        if layer in counts:
+            counts[layer] = count
 
-    hours: dict[str, float] = {"family": 0.0, "work": 0.0, "personal": 0.0}
-    for layer, start_at, end_at in rows:
-        diff = (end_at - start_at).total_seconds() / 3600
-        if layer in hours:
-            hours[layer] += diff
-
-    week_hours = WeekHours(
-        family=round(hours["family"], 1),
-        work=round(hours["work"], 1),
-        personal=round(hours["personal"], 1),
+    week_events = WeekEventCount(
+        family=counts["family"],
+        work=counts["work"],
+        personal=counts["personal"],
     )
 
     # ── 3. Tareas pendientes hoy ──────────────────────────────────────────────
@@ -86,6 +84,6 @@ async def get_home_summary(db: AsyncSession, user_id: uuid.UUID) -> HomeSummary:
 
     return HomeSummary(
         upcoming_events=upcoming_events,
-        week_hours_by_layer=week_hours,
+        week_events_by_layer=week_events,
         today_tasks_pending=today_tasks_pending,
     )
