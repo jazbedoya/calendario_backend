@@ -48,15 +48,20 @@ async def delete(db: AsyncSession, user_id: uuid.UUID, task_id: uuid.UUID) -> No
 
 
 def _compute_streaks(done_dates: list[date], today: date) -> tuple[int, int]:
-    """Pure function: returns (current_streak, longest_streak)."""
+    """Pure function: returns (current_streak, longest_streak).
+
+    The streak is maintained from previous days and TODAY counts as soon as
+    at least one task is completed.  If today has no completions yet, we
+    preserve the streak from yesterday so it isn't prematurely broken.
+    """
     if not done_dates:
         return 0, 0
 
     date_set = set(done_dates)
 
-    # Current streak: consecutive days ending today (or yesterday if today has none)
+    # Start from today; if nothing today yet, start from yesterday
+    check = today if today in date_set else today - timedelta(days=1)
     current = 0
-    check = today
     while check in date_set:
         current += 1
         check -= timedelta(days=1)
