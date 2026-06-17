@@ -90,4 +90,10 @@ async def get_streak(db: AsyncSession, user_id: uuid.UUID, timezone: str) -> Str
 
     done_dates = await repo.get_done_dates(db, user_id)
     current, longest = _compute_streaks(done_dates, today)
-    return StreakResponse(current_streak=current, longest_streak=longest)
+
+    # Week Mon–Sun containing today
+    date_set = set(done_dates)
+    monday = today - timedelta(days=today.weekday())  # weekday(): Mon=0, Sun=6
+    week_done = [monday + timedelta(days=i) in date_set for i in range(7)]
+
+    return StreakResponse(current_streak=current, longest_streak=longest, week_done=week_done)

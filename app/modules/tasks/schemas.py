@@ -28,3 +28,4 @@ class TaskResponse(BaseModel):
 class StreakResponse(BaseModel):
     current_streak: int
     longest_streak: int
+    week_done: list[bool]  # 7 booleans, index 0 = Monday of current week
