@@ -5,8 +5,15 @@ from sqlalchemy.orm import DeclarativeBase
 
 from app.config import settings
 
+def _asyncpg_url(url: str) -> str:
+    """Normalize any postgresql:// variant to postgresql+asyncpg://"""
+    return (
+        url.replace("postgres://", "postgresql+asyncpg://", 1)
+           .replace("postgresql://", "postgresql+asyncpg://", 1)
+    )
+
 engine = create_async_engine(
-    str(settings.database_url),
+    _asyncpg_url(str(settings.database_url)),
     echo=settings.debug,
     pool_pre_ping=True,
     pool_size=10,

@@ -22,6 +22,7 @@ dependencies = [
     "cryptography>=42.0.7",
     "structlog>=24.1.0",
     "email-validator>=2.1.0",
+    "psycopg2-binary>=2.9.9",
 ]
 
 [project.optional-dependencies]

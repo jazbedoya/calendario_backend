@@ -16,9 +16,13 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Use DATABASE_URL from settings; replace asyncpg driver with psycopg2 for Alembic sync
-_sync_url = str(settings.database_url).replace(
-    "postgresql+asyncpg://", "postgresql+psycopg2://"
+# Normalize to psycopg2 for Alembic sync (handles all postgresql:// variants)
+_raw_url = str(settings.database_url)
+_sync_url = (
+    _raw_url
+    .replace("postgresql+asyncpg://", "postgresql+psycopg2://", 1)
+    .replace("postgres://", "postgresql+psycopg2://", 1)
+    .replace("postgresql://", "postgresql+psycopg2://", 1)
 )
 config.set_main_option("sqlalchemy.url", _sync_url)
 
