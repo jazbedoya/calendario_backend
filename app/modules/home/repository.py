@@ -22,12 +22,12 @@ def _week_bounds() -> tuple[datetime, datetime]:
 async def get_home_summary(db: AsyncSession, user_id: uuid.UUID) -> HomeSummary:
     now = datetime.now(timezone.utc)
 
-    # ── 1. Próximos 5 eventos ─────────────────────────────────────────────────
+    # ── 1. Próximos 5 eventos (incluye en curso: end_at > now) ────────────────
     result = await db.execute(
         select(Event)
         .where(
             Event.user_id == user_id,
-            Event.start_at >= now,
+            Event.end_at > now,
             Event.deleted_at.is_(None),
         )
         .order_by(Event.start_at.asc())
