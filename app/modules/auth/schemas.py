@@ -1,5 +1,5 @@
 import uuid
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 
 from pydantic import BaseModel, EmailStr
@@ -33,6 +33,7 @@ class UserResponse(BaseModel):
     weekly_intentions: Any | None = None
     weekly_intentions_week: date | None = None
     language: str = "es"
+    created_at: datetime
 
     model_config = {"from_attributes": True}
 
