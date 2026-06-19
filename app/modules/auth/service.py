@@ -71,7 +71,8 @@ async def google_login_via_code(db: AsyncSession, code: str, redirect_uri: str) 
             },
         )
     if token_resp.status_code != 200:
-        raise AppException(400, f"Google code exchange failed: {token_resp.text}")
+        log.error("google.code_exchange_failed", status=token_resp.status_code)
+        raise AppException(400, "Google authentication failed")
     google_access_token = token_resp.json().get("access_token")
     return await google_auth(db, GoogleAuthRequest(access_token=google_access_token))
 

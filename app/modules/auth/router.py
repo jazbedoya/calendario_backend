@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
+from app.core.rate_limit import limiter
 from app.dependencies import get_current_user
 from app.modules.auth import service
 from app.modules.auth.models import User
@@ -98,7 +99,7 @@ async def google_callback(
                 "access_token": tokens.access_token,
                 "refresh_token": tokens.refresh_token,
             })
-            return RedirectResponse(url=f"{redirect_to}?{params}")
+            return RedirectResponse(url=f"{redirect_to}#{params}")
     except Exception as exc:
         log.error("auth.google_callback", flow=flow_type, error=str(exc))
         return RedirectResponse(url=f"{redirect_to}?error=server_error")
@@ -112,6 +113,7 @@ async def google_auth(data: GoogleAuthRequest, db: AsyncSession = Depends(get_db
 
 
 @router.post("/signup", response_model=VerificationPendingResponse, status_code=202)
+@limiter.limit("3/minute")
 async def signup(data: SignupRequest, request: Request, db: AsyncSession = Depends(get_db)) -> VerificationPendingResponse:
     base_url = settings.app_base_url or str(request.base_url).rstrip("/")
     return await service.signup(db, data, base_url)
@@ -152,13 +154,15 @@ async def verify_email(
 
 
 @router.post("/resend-verification", status_code=204)
+@limiter.limit("2/minute")
 async def resend_verification(data: ResendVerificationRequest, request: Request, db: AsyncSession = Depends(get_db)) -> None:
     base_url = settings.app_base_url or str(request.base_url).rstrip("/")
     await service.resend_verification(db, data.email, base_url)
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)) -> TokenResponse:
+@limiter.limit("5/minute")
+async def login(data: LoginRequest, request: Request, db: AsyncSession = Depends(get_db)) -> TokenResponse:
     return await service.login(db, data)
 
 
@@ -184,6 +188,7 @@ async def patch_me(
 
 
 @router.post("/forgot-password", status_code=204)
+@limiter.limit("2/minute")
 async def forgot_password(
     data: ForgotPasswordRequest,
     request: Request,
@@ -194,8 +199,10 @@ async def forgot_password(
 
 
 @router.post("/reset-password", status_code=204)
+@limiter.limit("3/minute")
 async def reset_password(
     data: ResetPasswordRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> None:
     await service.confirm_password_reset(db, data.token, data.new_password)

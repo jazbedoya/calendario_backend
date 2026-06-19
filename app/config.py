@@ -22,7 +22,7 @@ class Settings(BaseSettings):
 
     # Auth
     access_token_expire_minutes: int = 30
-    refresh_token_expire_days: int = 30
+    refresh_token_expire_days: int = 7
 
     # Google OAuth
     google_client_id: str = ""

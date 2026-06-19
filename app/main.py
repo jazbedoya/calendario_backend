@@ -8,10 +8,14 @@ if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 import structlog
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from app.config import settings
+from app.core.rate_limit import limiter
 from app.core.exceptions import AppException, app_exception_handler, unhandled_exception_handler
 from app.modules.auth.router import router as auth_router
 from app.modules.calendar.router import router as calendar_router
@@ -47,12 +51,21 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Mobile app (Expo) sends requests from variable origins
+    allow_origins=[
+        "https://calendariobackend-production.up.railway.app",
+        "https://jazbedoya.github.io",
+        "http://localhost:8085",
+        "http://localhost:8086",
+        "http://localhost:19006",
+    ],
     allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 app.add_exception_handler(AppException, app_exception_handler)  # type: ignore[arg-type]
