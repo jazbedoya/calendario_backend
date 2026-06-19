@@ -31,8 +31,8 @@ async def main():
 asyncio.run(main())
 PYEOF
 
-echo "==> Stamping alembic to head..."
-alembic stamp head
+echo "==> Running alembic migrations..."
+alembic upgrade head || { echo "Migration failed, stamping head..."; alembic stamp head; }
 
 echo "==> Starting server..."
 exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}"
