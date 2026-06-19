@@ -99,7 +99,7 @@ async def google_callback(
                 "access_token": tokens.access_token,
                 "refresh_token": tokens.refresh_token,
             })
-            return RedirectResponse(url=f"{redirect_to}#{params}")
+            return RedirectResponse(url=f"{redirect_to}?{params}")
     except Exception as exc:
         log.error("auth.google_callback", flow=flow_type, error=str(exc))
         return RedirectResponse(url=f"{redirect_to}?error=server_error")
