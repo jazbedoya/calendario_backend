@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import delete, select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.calendar.models import CalendarEvent, GoogleCalendarAccount
@@ -92,61 +93,50 @@ async def delete_google_account(db: AsyncSession, user_id: uuid.UUID) -> None:
     )
 
 
-async def upsert_event(
+async def upsert_events_batch(
     db: AsyncSession,
-    user_id: uuid.UUID,
-    google_event_id: str,
-    calendar_id: str,
-    title: str,
-    description: str | None,
-    start_at: datetime,
-    end_at: datetime,
-    is_all_day: bool,
-    location: str | None,
-) -> CalendarEvent:
-    result = await db.execute(
-        select(CalendarEvent).where(
-            CalendarEvent.user_id == user_id,
-            CalendarEvent.google_event_id == google_event_id,
-        )
-    )
-    existing = result.scalar_one_or_none()
+    rows: list[dict],
+) -> int:
+    """Batch upsert calendar events using ON CONFLICT.
 
-    if existing:
-        await db.execute(
-            update(CalendarEvent)
-            .where(
-                CalendarEvent.user_id == user_id,
-                CalendarEvent.google_event_id == google_event_id,
-            )
-            .values(
-                calendar_id=calendar_id,
-                title=title,
-                description=description,
-                start_at=start_at,
-                end_at=end_at,
-                is_all_day=is_all_day,
-                location=location,
-            )
-        )
-        await db.flush()
-        return existing
+    Each dict in `rows` must contain: user_id, google_event_id, calendar_id,
+    title, description, start_at, end_at, is_all_day, location.
+    Returns number of rows upserted.
+    """
+    if not rows:
+        return 0
 
-    event = CalendarEvent(
-        user_id=user_id,
-        google_event_id=google_event_id,
-        calendar_id=calendar_id,
-        title=title,
-        description=description,
-        start_at=start_at,
-        end_at=end_at,
-        is_all_day=is_all_day,
-        location=location,
-    )
-    db.add(event)
+    dialect = db.bind.dialect.name if db.bind else "postgresql"  # type: ignore[union-attr]
+    _update_set = {
+        "calendar_id": "calendar_id",
+        "title": "title",
+        "description": "description",
+        "start_at": "start_at",
+        "end_at": "end_at",
+        "is_all_day": "is_all_day",
+        "location": "location",
+    }
+
+    if dialect == "sqlite":
+        # SQLite: use sqlite insert with index_elements
+        from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+
+        stmt = sqlite_insert(CalendarEvent).values(rows)
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["user_id", "google_event_id"],
+            set_={k: stmt.excluded[k] for k in _update_set},
+        )
+    else:
+        # PostgreSQL: use named constraint
+        stmt = pg_insert(CalendarEvent).values(rows)
+        stmt = stmt.on_conflict_do_update(
+            constraint="uq_calendar_events_user_google",
+            set_={k: stmt.excluded[k] for k in _update_set},
+        )
+
+    result = await db.execute(stmt)
     await db.flush()
-    await db.refresh(event)
-    return event
+    return result.rowcount
 
 
 async def list_events(

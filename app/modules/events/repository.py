@@ -83,13 +83,14 @@ async def update_event(
     filtered = {k: v for k, v in fields.items() if v is not None}
     if not filtered:
         return await get_event(db, event_id, user_id)
-    await db.execute(
+    result = await db.execute(
         update(Event)
         .where(Event.id == event_id, Event.user_id == user_id)
         .values(**filtered)
+        .returning(Event)
     )
     await db.flush()
-    return await get_event(db, event_id, user_id)
+    return result.scalar_one_or_none()
 
 
 async def delete_event(

@@ -50,13 +50,14 @@ async def update_task(
     filtered = {k: v for k, v in fields.items() if v is not None}
     if not filtered:
         return await get(db, task_id, user_id)
-    await db.execute(
+    result = await db.execute(
         update(DailyTask)
         .where(DailyTask.id == task_id, DailyTask.user_id == user_id)
         .values(**filtered)
+        .returning(DailyTask)
     )
     await db.flush()
-    return await get(db, task_id, user_id)
+    return result.scalar_one_or_none()
 
 
 async def delete_task(db: AsyncSession, task_id: uuid.UUID, user_id: uuid.UUID) -> bool:

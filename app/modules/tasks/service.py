@@ -35,8 +35,7 @@ async def patch(
     if "text" in fields:
         fields["text"] = fields["text"].strip()
     # update_task filters out None values, but `done=False` must pass through
-    await repo.update_task(db, task_id, user_id, **fields)
-    updated = await repo.get(db, task_id, user_id)
+    updated = await repo.update_task(db, task_id, user_id, **fields)
     return updated  # type: ignore[return-value]
 
 

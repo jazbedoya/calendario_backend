@@ -228,8 +228,8 @@ async def sync_user_calendar(db: object, user_id: uuid.UUID) -> int:
 
     items = resp.json().get("items", [])
     log.info("calendar.items_fetched", count=len(items), user_id=str(user_id))
-    count = 0
 
+    rows: list[dict] = []
     for item in items:
         if item.get("status") == "cancelled":
             continue
@@ -249,20 +249,19 @@ async def sync_user_calendar(db: object, user_id: uuid.UUID) -> int:
             if end_at.tzinfo is None:
                 end_at = end_at.replace(tzinfo=timezone.utc)
 
-        await repo.upsert_event(
-            db,
-            user_id=user_id,
-            google_event_id=item["id"],
-            calendar_id="primary",
-            title=item.get("summary", ""),
-            description=item.get("description"),
-            start_at=start_at,
-            end_at=end_at,
-            is_all_day=is_all_day,
-            location=item.get("location"),
-        )
-        count += 1
+        rows.append({
+            "user_id": user_id,
+            "google_event_id": item["id"],
+            "calendar_id": "primary",
+            "title": item.get("summary", ""),
+            "description": item.get("description"),
+            "start_at": start_at,
+            "end_at": end_at,
+            "is_all_day": is_all_day,
+            "location": item.get("location"),
+        })
 
+    count = await repo.upsert_events_batch(db, rows)
     await repo.update_last_synced(db, user_id)
     log.info("calendar.synced", user_id=str(user_id), count=count)
     return count

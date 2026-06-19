@@ -58,11 +58,11 @@ async def create_event(db: AsyncSession, user_id: uuid.UUID, data: EventCreate) 
     if data.recurrence_rule:
         count = _RECURRENCE_COUNTS.get(data.recurrence_rule, 12)
         duration = data.end_at - data.start_at
+        occurrences = []
         for i in range(1, count + 1):
             occ_start = _offset_dt(data.start_at, data.recurrence_rule, i)
             occ_end   = occ_start + duration
-            await repo.create_event(
-                db,
+            occurrences.append(Event(
                 user_id=user_id,
                 title=data.title,
                 description=data.description,
@@ -73,7 +73,9 @@ async def create_event(db: AsyncSession, user_id: uuid.UUID, data: EventCreate) 
                 layer=data.layer,
                 recurrence_rule=data.recurrence_rule,
                 recurrence_parent_id=event.id,
-            )
+            ))
+        db.add_all(occurrences)
+        await db.flush()
         log.info(
             "event.recurrence_created",
             user_id=str(user_id),

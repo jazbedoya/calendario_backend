@@ -66,13 +66,14 @@ async def update_entry(
     filtered = {k: v for k, v in fields.items() if v is not None}
     if not filtered:
         return await get_entry(db, entry_id, user_id)
-    await db.execute(
+    result = await db.execute(
         update(ContextEntry)
         .where(ContextEntry.id == entry_id, ContextEntry.user_id == user_id)
         .values(**filtered)
+        .returning(ContextEntry)
     )
     await db.flush()
-    return await get_entry(db, entry_id, user_id)
+    return result.scalar_one_or_none()
 
 
 async def delete_entry(
