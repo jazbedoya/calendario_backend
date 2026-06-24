@@ -1,6 +1,13 @@
 # Avante — Backend API
 
-REST API for [Avante](https://play.google.com/store/apps/details?id=com.jazbedoya.avante), a mobile app that helps people balance family, work, and personal time with emotional context awareness.
+[![Google Play](https://img.shields.io/badge/Google_Play-Published-green?logo=google-play)](https://play.google.com/store/apps/details?id=com.jazbedoya.avante)
+[![FastAPI](https://img.shields.io/badge/FastAPI-async-009688?logo=fastapi)](https://fastapi.tiangolo.com/)
+[![Python](https://img.shields.io/badge/Python-3.12-blue?logo=python)](https://python.org)
+[![Railway](https://img.shields.io/badge/Railway-deployed-purple?logo=railway)](https://railway.app)
+
+REST API for [Avante](https://play.google.com/store/apps/details?id=com.jazbedoya.avante), a mobile app **published on Google Play** that helps people balance family, work, and personal time with emotional context awareness.
+
+> See the mobile app with screenshots: [calendario_front](https://github.com/jazbedoya/calendario_front)
 
 ## Tech Stack
 
