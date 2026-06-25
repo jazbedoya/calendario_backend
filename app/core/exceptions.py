@@ -15,14 +15,16 @@ async def app_exception_handler(request: Request, exc: AppException) -> JSONResp
 async def unhandled_exception_handler(
     request: Request, exc: Exception
 ) -> JSONResponse:
+    import traceback
     import structlog
-    from app.config import settings
     log = structlog.get_logger()
-    if settings.debug:
-        import traceback
-        log.error("unhandled_exception", error=str(exc), traceback=traceback.format_exc())
-    else:
-        log.error("unhandled_exception", error=type(exc).__name__, path=str(request.url.path))
+    log.error(
+        "unhandled_exception",
+        error=str(exc),
+        error_type=type(exc).__name__,
+        path=str(request.url.path),
+        traceback=traceback.format_exc(),
+    )
     return JSONResponse(
         status_code=500,
         content={"detail": "Internal server error"},

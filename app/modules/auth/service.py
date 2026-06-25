@@ -104,7 +104,10 @@ async def signup(db: AsyncSession, data: SignupRequest, base_url: str) -> Verifi
     log.info("user.signup", user_id=str(user.id))
 
     if settings.resend_api_key:
-        await _send_verification_email(user.email, user.full_name, verify_url)
+        try:
+            await _send_verification_email(user.email, user.full_name, verify_url)
+        except Exception as exc:
+            log.error("email.verification_send_failed", error=str(exc), user_id=str(user.id))
 
     return VerificationPendingResponse(email=user.email)
 
@@ -203,7 +206,10 @@ async def request_password_reset(db: AsyncSession, email: str, base_url: str) ->
     redirect_url = f"{base_url}/auth/reset-password/redirect?token={token}"
     log.info("auth.password_reset_requested", user_id=str(user.id), redirect_url=redirect_url)
     if settings.resend_api_key:
-        await _send_reset_email(user.email, user.full_name, redirect_url)
+        try:
+            await _send_reset_email(user.email, user.full_name, redirect_url)
+        except Exception as exc:
+            log.error("email.reset_send_failed", error=str(exc), user_id=str(user.id))
 
 
 async def verify_email(db: AsyncSession, token: str) -> None:
@@ -239,7 +245,10 @@ async def resend_verification(db: AsyncSession, email: str, base_url: str) -> No
 
     verify_url = f"{base_url}/auth/verify?token={token}"
     if settings.resend_api_key:
-        await _send_verification_email(user.email, user.full_name, verify_url)
+        try:
+            await _send_verification_email(user.email, user.full_name, verify_url)
+        except Exception as exc:
+            log.error("email.verification_send_failed", error=str(exc), user_id=str(user.id))
     log.info("user.resend_verification", user_id=str(user.id))
 
 
