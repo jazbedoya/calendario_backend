@@ -38,7 +38,13 @@ log = structlog.get_logger()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    log.info("startup", env=settings.app_env)
+    log.info(
+        "startup",
+        env=settings.app_env,
+        resend_configured=bool(settings.resend_api_key),
+        email_from=settings.email_from,
+        app_base_url=settings.app_base_url or "(from request)",
+    )
     yield
     log.info("shutdown")
 

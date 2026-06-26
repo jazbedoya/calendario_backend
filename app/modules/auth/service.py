@@ -253,10 +253,12 @@ async def resend_verification(db: AsyncSession, email: str, base_url: str) -> No
 
 
 async def _send_verification_email(to_email: str, full_name: str, verify_url: str) -> None:
+    import html as html_mod
+    safe_name = html_mod.escape(full_name)
     html = f"""
     <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#ffffff">
       <h1 style="color:#C8553D;font-size:22px;margin:0 0 16px">Avante</h1>
-      <p style="color:#2D2D2D;font-size:16px;margin:0 0 8px">Hola {full_name},</p>
+      <p style="color:#2D2D2D;font-size:16px;margin:0 0 8px">Hola {safe_name},</p>
       <p style="color:#4A4A4A;margin:0 0 24px">Tu cuenta está casi lista. Solo tienes que verificar tu email para activarla.</p>
       <a href="{verify_url}" style="display:inline-block;background:#C8553D;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:12px;font-weight:700;font-size:15px">Iniciar sesión en la app</a>
       <p style="color:#9A9A9A;font-size:12px;margin:24px 0 4px">Si el botón no funciona, copia este enlace en tu navegador:</p>
@@ -266,7 +268,7 @@ async def _send_verification_email(to_email: str, full_name: str, verify_url: st
     </div>
     """
     async with httpx.AsyncClient() as client:
-        await client.post(
+        resp = await client.post(
             "https://api.resend.com/emails",
             headers={"Authorization": f"Bearer {settings.resend_api_key}"},
             json={
@@ -276,11 +278,15 @@ async def _send_verification_email(to_email: str, full_name: str, verify_url: st
                 "html": html,
             },
         )
+    if resp.status_code >= 400:
+        log.warning("email.resend_error", status=resp.status_code, body=resp.text[:200], to=to_email)
 
 
 async def _send_reset_email(to_email: str, full_name: str, reset_url: str) -> None:
+    import html as html_mod
+    safe_name = html_mod.escape(full_name)
     async with httpx.AsyncClient() as client:
-        await client.post(
+        resp = await client.post(
             "https://api.resend.com/emails",
             headers={"Authorization": f"Bearer {settings.resend_api_key}"},
             json={
@@ -288,12 +294,14 @@ async def _send_reset_email(to_email: str, full_name: str, reset_url: str) -> No
                 "to": [to_email],
                 "subject": "Recupera tu contraseña · Avante",
                 "html": (
-                    f"<p>Hola {full_name},</p>"
+                    f"<p>Hola {safe_name},</p>"
                     f"<p><a href='{reset_url}'>Pulsa aquí para restablecer tu contraseña</a></p>"
                     f"<p>El enlace expira en 15 minutos.</p>"
                 ),
             },
         )
+    if resp.status_code >= 400:
+        log.warning("email.resend_error", status=resp.status_code, body=resp.text[:200], to=to_email)
 
 
 async def confirm_password_reset(db: AsyncSession, token: str, new_password: str) -> None:
